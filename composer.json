@@ -1,0 +1,14 @@
+{
+  "name": "genderapi/genderapi",
+  "description": "Official PHP SDK for GenderAPI.io",
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "php": ">=7.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "GenderApi\\": "src/"
+    }
+  }
+}
