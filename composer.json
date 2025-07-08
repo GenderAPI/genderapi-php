@@ -1,7 +1,7 @@
 {
   "name": "genderapi/genderapi",
   "description": "Official PHP SDK for GenderAPI.io",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "library",
   "license": "MIT",
   "require": {

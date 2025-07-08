@@ -89,6 +89,60 @@ class GenderApi
     }
 
     /**
+     * Determine gender for multiple names (bulk).
+     *
+     * @param array $data Array of name objects. Each:
+     *                    [ 'name' => string, 'country' => ?string, 'id' => ?string|int ]
+     * @return array JSON response as associative array.
+     * @throws \Exception
+     */
+    public function getGenderByNameBulk(array $data)
+    {
+        if (count($data) > 100) {
+            throw new \Exception("getGenderByNameBulk cannot exceed 100 records per request.");
+        }
+        return $this->postRequest('/api/name/multi/country', [
+            'data' => $data
+        ]);
+    }
+
+    /**
+     * Determine gender for multiple emails (bulk).
+     *
+     * @param array $data Array of email objects. Each:
+     *                    [ 'email' => string, 'country' => ?string, 'id' => ?string|int ]
+     * @return array JSON response as associative array.
+     * @throws \Exception
+     */
+    public function getGenderByEmailBulk(array $data)
+    {
+        if (count($data) > 50) {
+            throw new \Exception("getGenderByEmailBulk cannot exceed 50 records per request.");
+        }
+        return $this->postRequest('/api/email/multi', [
+            'data' => $data
+        ]);
+    }
+
+    /**
+     * Determine gender for multiple usernames (bulk).
+     *
+     * @param array $data Array of username objects. Each:
+     *                    [ 'username' => string, 'country' => ?string, 'id' => ?string|int ]
+     * @return array JSON response as associative array.
+     * @throws \Exception
+     */
+    public function getGenderByUsernameBulk(array $data)
+    {
+        if (count($data) > 50) {
+            throw new \Exception("getGenderByUsernameBulk cannot exceed 50 records per request.");
+        }
+        return $this->postRequest('/api/username/multi', [
+            'data' => $data
+        ]);
+    }
+
+    /**
      * Internal helper method to send POST requests via cURL.
      *
      * @param string $endpoint API endpoint (e.g. /api)
@@ -132,7 +186,6 @@ class GenderApi
         if ($httpCode == 500 || $httpCode == 502 || $httpCode == 503 || $httpCode == 504 || $httpCode == 408) {
             throw new \Exception("GenderAPI server error (500).");
         }
-
 
         $json = json_decode($response, true);
 
