@@ -129,17 +129,10 @@ class GenderApi
             throw new \Exception("cURL error: $curlError");
         }
 
-        if ($httpCode == 500) {
+        if ($httpCode == 500 || $httpCode == 502 || $httpCode == 503 || $httpCode == 504 || $httpCode == 408) {
             throw new \Exception("GenderAPI server error (500).");
         }
 
-        if ($httpCode != 200) {
-            $errorResponse = json_decode($response, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \Exception("HTTP $httpCode: Response not valid JSON.");
-            }
-            return $errorResponse;
-        }
 
         $json = json_decode($response, true);
 
