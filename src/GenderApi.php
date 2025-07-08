@@ -119,7 +119,7 @@ class GenderApi
         if (count($data) > 50) {
             throw new \Exception("getGenderByEmailBulk cannot exceed 50 records per request.");
         }
-        return $this->postRequest('/api/email/multi', [
+        return $this->postRequest('/api/email/multi/country', [
             'data' => $data
         ]);
     }
@@ -137,7 +137,7 @@ class GenderApi
         if (count($data) > 50) {
             throw new \Exception("getGenderByUsernameBulk cannot exceed 50 records per request.");
         }
-        return $this->postRequest('/api/username/multi', [
+        return $this->postRequest('/api/username/multi/country', [
             'data' => $data
         ]);
     }
