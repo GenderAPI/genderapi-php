@@ -1,9 +1,12 @@
 {
   "name": "genderapi/genderapi",
-  "description": "Official PHP SDK for GenderAPI.io",
+  "description": "Legacy V1 PHP client for GenderAPI.io",
   "version": "1.0.3",
   "type": "library",
   "license": "MIT",
+  "support": {
+    "docs": "https://www.genderapi.io/api-documentation/v1"
+  },
   "require": {
     "php": ">=7.2"
   },
