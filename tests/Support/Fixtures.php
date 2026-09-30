@@ -27,6 +27,20 @@ final class Fixtures
     }
 
     /**
+     * A published success example as a request with a recognised API key sees it
+     * (the published examples show meta.access.mode "ip_trial").
+     *
+     * @return array<string, mixed>
+     */
+    public static function keyed(string $key): array
+    {
+        $body = self::get($key);
+        $body['meta']['access'] = ['mode' => 'api_key', 'reason' => null];
+
+        return $body;
+    }
+
+    /**
      * A Problem body shaped like the API's (for statuses without a published example).
      *
      * @param array<string, mixed> $usage

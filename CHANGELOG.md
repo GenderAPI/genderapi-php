@@ -8,7 +8,9 @@ are published to Packagist from git tags.
 ### Breaking
 
 - The client now targets the **GenderAPI.io V2 API** (`https://api.genderapi.io/api/v2`). The V1 routes, request
-  fields and flat response arrays are no longer used. 1.x stays available on the `v1` branch (maintenance only).
+  fields and flat response arrays are no longer used by 2.0. 1.x (V1 API) stays available and installable
+  indefinitely, with no deprecation or shutdown planned: pin it with `composer require genderapi/genderapi:^1.0`.
+  The source stays on the `v1` branch.
 - The entry class `GenderApi\GenderApi` is replaced by `GenderApi\Client`. The root namespace `GenderApi\` is
   unchanged, and the sub-namespaces `GenderApi\Response`, `GenderApi\Exception` and `GenderApi\Http` are new.
 - The V1 methods `getGenderByName`, `getGenderByEmail`, `getGenderByUsername` and the `*Bulk` methods are removed.
@@ -29,6 +31,10 @@ are published to Packagist from git tags.
 - `usage()` (free), `validatePhone()`, `capabilities()` and `errorCatalog()`.
 - Works without an API key through the server-side IP trial (10 credits / 24 h). The key can come from
   `GENDERAPI_API_KEY`.
+- `requireApiKeyAccess` constructor option (default `true` when a key is configured): a successful response whose
+  `meta.access.mode` is not `api_key` throws `GenderApi\Exception\UnexpectedAccessModeException`
+  (`unexpected_access_mode`), which carries the full result, the access mode and reason, status and request ID.
+  The request is not retried. Not applied to `capabilities()` / `errorCatalog()` or without a key.
 - Client-side validation that mirrors the request schema and throws before any network request.
 - cURL transport with a PHP-streams fallback. A pluggable `GenderApi\Http\Transport` interface.
 - PHPUnit test suite that runs against the OpenAPI examples, mocked HTTP and a local stub server. GitHub Actions CI
@@ -43,7 +49,8 @@ are published to Packagist from git tags.
 
 ## [1.0.3] and earlier
 
-V1 API client. See the `v1` branch and the [V1 documentation](https://www.genderapi.io/api-documentation/v1).
+V1 API client. It stays available and installable indefinitely (`composer require genderapi/genderapi:^1.0`),
+with no deprecation or shutdown planned. See the `v1` branch and the [V1 documentation](https://www.genderapi.io/api-documentation/v1).
 
 [2.0.0]: https://github.com/GenderAPI/genderapi-php/releases/tag/v2.0.0
 [1.0.3]: https://github.com/GenderAPI/genderapi-php/releases/tag/v1.0.3

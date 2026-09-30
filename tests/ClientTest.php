@@ -16,12 +16,17 @@ use GenderApi\Exception\RedirectException;
 use GenderApi\Exception\ServerException;
 use GenderApi\Exception\TimeoutException;
 use GenderApi\Exception\TransportException;
+use GenderApi\Exception\UnexpectedAccessModeException;
 use GenderApi\Exception\UnexpectedResponseException;
 use GenderApi\Exception\ValidationException;
 use GenderApi\Http\HttpResponse;
 use GenderApi\Internal\ResponseShape;
 use GenderApi\Item;
 use GenderApi\Response\BatchItemResult;
+use GenderApi\Response\BatchResult;
+use GenderApi\Response\GenderResult;
+use GenderApi\Response\PhoneResult;
+use GenderApi\Response\UsageResult;
 use GenderApi\Tests\Support\Fixtures;
 use GenderApi\Tests\Support\MockTransport;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -65,7 +70,7 @@ final class ClientTest extends TestCase
     public function testApiKeyFromEnvironment(): void
     {
         putenv(Client::API_KEY_ENV . '=' . self::KEY);
-        $transport = new MockTransport(MockTransport::json(200, Fixtures::get('POST /api/v2/gender 200 dataset')));
+        $transport = new MockTransport(MockTransport::json(200, Fixtures::keyed('POST /api/v2/gender 200 dataset')));
         $client = new Client(transport: $transport);
         self::assertTrue($client->hasApiKey());
         $client->name('Onur');
@@ -146,7 +151,7 @@ final class ClientTest extends TestCase
 
     public function testRequestHeadersAndUrl(): void
     {
-        $transport = new MockTransport(MockTransport::json(200, Fixtures::get('POST /api/v2/gender 200 dataset')));
+        $transport = new MockTransport(MockTransport::json(200, Fixtures::keyed('POST /api/v2/gender 200 dataset')));
         $this->client($transport)->name('Onur', 'TR');
         $request = $transport->lastRequest();
 
@@ -164,14 +169,14 @@ final class ClientTest extends TestCase
 
     public function testMinimalSingleBodyUsesServerDefaults(): void
     {
-        $transport = new MockTransport(MockTransport::json(200, Fixtures::get('POST /api/v2/gender 200 dataset')));
+        $transport = new MockTransport(MockTransport::json(200, Fixtures::keyed('POST /api/v2/gender 200 dataset')));
         $this->client($transport)->name('Onur');
         self::assertSame('{"type":"name","value":"Onur"}', $transport->lastRequest()->body);
     }
 
     public function testFullSingleBodyUsesExactWireNames(): void
     {
-        $transport = new MockTransport(MockTransport::json(200, Fixtures::get('POST /api/v2/gender 200 dataset')));
+        $transport = new MockTransport(MockTransport::json(200, Fixtures::keyed('POST /api/v2/gender 200 dataset')));
         $this->client($transport)->gender('email', 'ayşe@example.com', 'TR', 'always', false, 'row-1');
         self::assertSame(
             '{"id":"row-1","type":"email","value":"ayşe@example.com","country":"TR","options":{"ai_mode":"always"}}',
@@ -181,7 +186,7 @@ final class ClientTest extends TestCase
 
     public function testForceToGenderizeBody(): void
     {
-        $transport = new MockTransport(MockTransport::json(200, Fixtures::get('POST /api/v2/gender 200 alias')));
+        $transport = new MockTransport(MockTransport::json(200, Fixtures::keyed('POST /api/v2/gender 200 alias')));
         $this->client($transport)->username('prenses', 'TR', forceToGenderize: true);
         self::assertSame(
             ['type' => 'username', 'value' => 'prenses', 'country' => 'TR', 'forceToGenderize' => true],
@@ -191,7 +196,7 @@ final class ClientTest extends TestCase
 
     public function testBatchBody(): void
     {
-        $transport = new MockTransport(MockTransport::json(200, Fixtures::get('POST /api/v2/gender/batch 200 batch')));
+        $transport = new MockTransport(MockTransport::json(200, Fixtures::keyed('POST /api/v2/gender/batch 200 batch')));
         $this->client($transport)->genderBatch([
             Item::name('Onur', 'TR', id: 'known'),
             ['id' => 'missing', 'type' => 'name', 'value' => 'zzzxxyy', 'country' => null, 'options' => ['ai_mode' => 'off']],
@@ -212,7 +217,7 @@ final class ClientTest extends TestCase
 
     public function testSingleDatasetSuccess(): void
     {
-        $fixture = Fixtures::get('POST /api/v2/gender 200 dataset');
+        $fixture = Fixtures::keyed('POST /api/v2/gender 200 dataset');
         $result = $this->client(new MockTransport(MockTransport::json(200, $fixture)))->name('Onur', 'TR');
 
         $d = $result->data;
@@ -243,13 +248,14 @@ final class ClientTest extends TestCase
         self::assertSame('2026-09-26T12:00:00.000Z', $m->usage?->resetsAt);
         self::assertSame(10, $m->usage?->limit);
         self::assertSame(86400, $m->usage?->periodSeconds);
-        self::assertTrue($m->access?->isIpTrial());
+        self::assertTrue($m->access?->isApiKey());
+        self::assertNull($m->access?->reason);
         self::assertSame($fixture, $result->toArray());
     }
 
     public function testSingleAiSuccessWithNegativeBalance(): void
     {
-        $result = $this->client(new MockTransport(MockTransport::json(200, Fixtures::get('POST /api/v2/gender 200 alias'))))
+        $result = $this->client(new MockTransport(MockTransport::json(200, Fixtures::keyed('POST /api/v2/gender 200 alias'))))
             ->username('prenses', 'TR', forceToGenderize: true);
 
         self::assertSame('female', $result->data->gender);
@@ -267,7 +273,7 @@ final class ClientTest extends TestCase
 
     public function testSingleUnknownIsASuccessfulBillableResult(): void
     {
-        $result = $this->client(new MockTransport(MockTransport::json(200, Fixtures::get('POST /api/v2/gender 200 unknown'))))
+        $result = $this->client(new MockTransport(MockTransport::json(200, Fixtures::keyed('POST /api/v2/gender 200 unknown'))))
             ->name('zzzxxyy');
 
         self::assertNull($result->data->gender);
@@ -291,7 +297,9 @@ final class ClientTest extends TestCase
         $body['meta']['future_meta'] = 'm';
         $body['meta']['access']['mode'] = 'some_future_mode';
 
-        $result = $this->client(new MockTransport(MockTransport::json(200, $body)))->name('Onur');
+        // Opt out of the access-mode check so the unknown mode is surfaced as data.
+        $client = new Client(self::KEY, transport: new MockTransport(MockTransport::json(200, $body)), requireApiKeyAccess: false);
+        $result = $client->name('Onur');
 
         self::assertSame('male', $result->data->gender);
         self::assertSame('value', $result->data->raw['future_field']);
@@ -304,7 +312,7 @@ final class ClientTest extends TestCase
 
     public function testBatchPartialSuccessIsNotAnException(): void
     {
-        $fixture = Fixtures::get('POST /api/v2/gender/batch 200 batch');
+        $fixture = Fixtures::keyed('POST /api/v2/gender/batch 200 batch');
         $result = $this->client(new MockTransport(MockTransport::json(200, $fixture)))->genderBatch([
             Item::name('Onur', 'TR', id: 'known'),
             Item::name('zzzxxyy', id: 'missing'),
@@ -339,7 +347,7 @@ final class ClientTest extends TestCase
 
     public function testUsage(): void
     {
-        $transport = new MockTransport(MockTransport::json(200, Fixtures::get('GET /api/v2/usage 200 usage')));
+        $transport = new MockTransport(MockTransport::json(200, Fixtures::keyed('GET /api/v2/usage 200 usage')));
         $usage = $this->client($transport)->usage();
 
         $request = $transport->lastRequest();
@@ -360,7 +368,7 @@ final class ClientTest extends TestCase
 
     public function testValidatePhone(): void
     {
-        $transport = new MockTransport(MockTransport::json(200, Fixtures::get('POST /api/v2/phone/validate 200 phone')));
+        $transport = new MockTransport(MockTransport::json(200, Fixtures::keyed('POST /api/v2/phone/validate 200 phone')));
         $phone = $this->client($transport)->validatePhone('0555 000 00 00', 'TR');
 
         self::assertSame('https://api.genderapi.io/api/v2/phone/validate', $transport->lastRequest()->url);
@@ -389,6 +397,117 @@ final class ClientTest extends TestCase
         self::assertSame('wait_then_retry', $client->errorCatalog()['rate_limit_exceeded']['action']);
         self::assertSame('https://api.genderapi.io/api/v2/errors', $transport->requests[1]->url);
         self::assertArrayNotHasKey('Authorization', $transport->requests[1]->headers);
+    }
+
+    // ---- access-mode check -----------------------------------------------------------------
+
+    public function testKeyedIpTrialResponseThrowsWithFullResult(): void
+    {
+        $fixture = Fixtures::get('POST /api/v2/gender 200 dataset'); // meta.access.mode "ip_trial"
+        $fixture['meta']['access']['reason'] = 'api_key_invalid';
+        $transport = new MockTransport(MockTransport::json(200, $fixture));
+        try {
+            $this->client($transport)->name('Onur', 'TR');
+            self::fail('Expected UnexpectedAccessModeException');
+        } catch (UnexpectedAccessModeException $e) {
+            self::assertInstanceOf(GenderApiException::class, $e);
+            self::assertSame('unexpected_access_mode', $e->errorCode);
+            self::assertSame('unexpected_access_mode', $e->getErrorCode());
+            self::assertSame('ip_trial', $e->accessMode);
+            self::assertSame('ip_trial', $e->getAccessMode());
+            self::assertSame('api_key_invalid', $e->getAccessReason());
+            self::assertSame(200, $e->status);
+            self::assertSame(200, $e->getStatus());
+            self::assertSame('11111111-1111-4111-8111-111111111111', $e->getRequestId());
+            self::assertSame($fixture, $e->getBody());
+            self::assertNotSame('', $e->rawBody);
+            $result = $e->getResult();
+            self::assertInstanceOf(GenderResult::class, $result);
+            self::assertSame($e->result, $result);
+            self::assertSame('male', $result->data->gender);
+            self::assertSame(1, $result->meta->usage?->chargedCredits);
+            self::assertSame($fixture, $result->toArray());
+            self::assertSame(
+                'Expected API-key access but the response reports access mode "ip_trial". '
+                . 'Check your API key; this request may have consumed IP-trial credits.',
+                $e->getMessage(),
+            );
+            self::assertStringNotContainsString(self::KEY, $e->getMessage());
+            self::assertStringNotContainsString(self::KEY, print_r($e->getResult(), true));
+        }
+        self::assertCount(1, $transport->requests, 'must not retry');
+    }
+
+    public function testIpTrialResponseWithoutKeyReturnsNormally(): void
+    {
+        $transport = new MockTransport(MockTransport::json(200, Fixtures::get('POST /api/v2/gender 200 dataset')));
+        $result = $this->client($transport, null)->name('Onur');
+        self::assertTrue($result->meta->access?->isIpTrial());
+        self::assertCount(1, $transport->requests);
+    }
+
+    public function testAccessModeCheckCanBeDisabled(): void
+    {
+        $transport = new MockTransport(MockTransport::json(200, Fixtures::get('POST /api/v2/gender 200 dataset')));
+        $client = new Client(self::KEY, transport: $transport, requireApiKeyAccess: false);
+        self::assertFalse($client->requiresApiKeyAccess());
+        self::assertTrue($this->client(new MockTransport())->requiresApiKeyAccess());
+        $result = $client->name('Onur');
+        self::assertTrue($result->meta->access?->isIpTrial());
+        self::assertCount(1, $transport->requests);
+    }
+
+    public function testMissingAccessModeIsAccepted(): void
+    {
+        $body = Fixtures::get('POST /api/v2/gender 200 dataset');
+        unset($body['meta']['access']);
+        $result = $this->client(new MockTransport(MockTransport::json(200, $body)))->name('Onur');
+        self::assertNull($result->meta->access);
+    }
+
+    public function testBatchWithTopLevelIpTrialThrows(): void
+    {
+        $transport = new MockTransport(MockTransport::json(200, Fixtures::get('POST /api/v2/gender/batch 200 batch')));
+        try {
+            $this->client($transport)->genderBatch([Item::name('Onur'), Item::name('zzzxxyy'), Item::name('Alex')]);
+            self::fail('Expected UnexpectedAccessModeException');
+        } catch (UnexpectedAccessModeException $e) {
+            self::assertSame('ip_trial', $e->getAccessMode());
+            self::assertInstanceOf(BatchResult::class, $e->getResult());
+            self::assertCount(3, $e->getResult());
+        }
+        self::assertCount(1, $transport->requests);
+    }
+
+    public function testUsageAndPhoneWithIpTrialThrow(): void
+    {
+        $transport = new MockTransport(
+            MockTransport::json(200, Fixtures::get('GET /api/v2/usage 200 usage')),
+            MockTransport::json(200, Fixtures::get('POST /api/v2/phone/validate 200 phone')),
+        );
+        $client = $this->client($transport);
+        try {
+            $client->usage();
+            self::fail('Expected UnexpectedAccessModeException');
+        } catch (UnexpectedAccessModeException $e) {
+            self::assertInstanceOf(UsageResult::class, $e->getResult());
+        }
+        try {
+            $client->validatePhone('0555 000 00 00', 'TR');
+            self::fail('Expected UnexpectedAccessModeException');
+        } catch (UnexpectedAccessModeException $e) {
+            self::assertInstanceOf(PhoneResult::class, $e->getResult());
+        }
+        self::assertCount(2, $transport->requests);
+    }
+
+    public function testPublicEndpointsAreNotAccessChecked(): void
+    {
+        $ipTrial = ['version' => '2.0.0', 'meta' => ['access' => ['mode' => 'ip_trial', 'reason' => 'api_key_missing']]];
+        $transport = new MockTransport(MockTransport::json(200, $ipTrial), MockTransport::json(200, $ipTrial));
+        $client = $this->client($transport);
+        self::assertSame('2.0.0', $client->capabilities()['version']);
+        self::assertSame('2.0.0', $client->errorCatalog()['version']);
     }
 
     // ---- errors ----------------------------------------------------------------------------

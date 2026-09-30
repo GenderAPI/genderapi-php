@@ -6,10 +6,11 @@ It infers a likely gender from a **name**, **email address** or **username** thr
 [GenderAPI.io V2 API](https://www.genderapi.io/api-documentation), and validates phone numbers.
 Results are inferences, not identity verification, and they can be **unknown**. Always handle `gender === null`.
 
-> **Version 2.0 is a breaking release for the V2 API.** The 1.x client, which uses the V1 API, is in
-> maintenance on the [`v1` branch](https://github.com/GenderAPI/genderapi-php/tree/v1). To stay on it, run
-> `composer require genderapi/genderapi:^1.0`, and see the [V1 documentation](https://www.genderapi.io/api-documentation/v1).
-> To upgrade, see [Migrating from 1.x](#migrating-from-1x).
+> **Version 2.0 is a breaking release for the V2 API.** 1.x (V1 API) stays available and installable
+> indefinitely; no deprecation or shutdown is planned. To keep using it, pin 1.x:
+> `composer require genderapi/genderapi:^1.0`. The source stays on the
+> [`v1` branch](https://github.com/GenderAPI/genderapi-php/tree/v1); see the
+> [V1 documentation](https://www.genderapi.io/api-documentation/v1). To upgrade, see [Migrating from 1.x](#migrating-from-1x).
 
 ## Requirements
 
@@ -37,8 +38,10 @@ $client = new Client();                 // reads GENDERAPI_API_KEY
 
 The client also works **without a key**. The server then applies the shared IP trial: 10 credits per public IP
 address per 24 hours, shared with V1. The server decides the trial, and the client adds no trial logic of its own.
-A missing, malformed or unrecognised key also falls back to the trial. When you integrate a paid account, check
-`$result->meta->access->mode === 'api_key'` (or call `usage()`, which is free).
+A missing, malformed or unrecognised key also falls back to the trial. When a key is configured, the client
+therefore checks `meta.access.mode` on every successful keyed response and throws
+`UnexpectedAccessModeException` if it is not `api_key` (see [Errors](#errors)); the request has already been
+processed and may have used trial credits. Turn this off with `requireApiKeyAccess: false`.
 
 **Server-side only.** Never embed your API key in browser JavaScript, mobile apps or other code you distribute.
 The key is sent only in the `Authorization: Bearer` header, never in a URL. It is hidden from
@@ -162,8 +165,15 @@ new Client(
     baseUrl: 'https://api.genderapi.io/api/v2',    // plain http only for localhost / 127.0.0.1 / [::1] test servers
     timeout: 10.0,                                 // seconds, whole request
     transport: null,                               // GenderApi\Http\Transport; default: cURL, or streams
+    requireApiKeyAccess: true,                     // with a key: throw if a response is not served as api_key
 );
 ```
+
+`requireApiKeyAccess` (default `true`) applies only when a key is configured. If a successful response from
+`gender()`/`name()`/`email()`/`username()`, `genderBatch()`, `usage()` or `validatePhone()` reports a
+`meta.access.mode` other than `api_key` (for example `ip_trial` because the key was not recognised), the client
+throws `UnexpectedAccessModeException`. It is never applied to `capabilities()` or `errorCatalog()`, and a
+response without `meta.access.mode` is accepted. Set it to `false` to receive such results normally.
 
 ## Response fields
 
@@ -229,6 +239,7 @@ All exceptions implement `GenderApi\Exception\GenderApiException`.
 | ↳ `ServerException` | 5xx responses (500, 502, 503, 504) |
 | `TransportException` / `TimeoutException` | No usable response: DNS, TLS, connection or timeout. The request may still have been processed and billed. |
 | `UnexpectedResponseException` / `RedirectException` | A 2xx response that is not V2 JSON, or a 3xx redirect. Redirects are never followed. |
+| `UnexpectedAccessModeException` | A key is configured but a successful response reports another `meta.access.mode` (usually `ip_trial`). **The request was already processed** and may have consumed IP-trial credits; it is not retried. |
 
 `ApiException` has these properties:
 
@@ -245,6 +256,12 @@ All exceptions implement `GenderApi\Exception\GenderApiException`.
 - `rawBody`, `headers`
 - `batchItems`: for a batch where every item failed
 
+`UnexpectedAccessModeException` (`errorCode` `unexpected_access_mode`) has `getResult()` / `result`: the complete
+parsed result the method would have returned (`GenderResult`, `BatchResult`, `UsageResult` or `PhoneResult`,
+including `meta->usage`), plus `getAccessMode()` / `accessMode`, `getAccessReason()` / `accessReason`,
+`getStatus()` / `status`, `getRequestId()` / `requestId`, `getBody()` / `body` (the decoded JSON), `rawBody` and
+`headers`. The message never contains the key. Disable the check with `requireApiKeyAccess: false`.
+
 Match on `errorCode` and `status`, never on the `detail` text. The full catalog is available from
 `$client->errorCatalog()` and at <https://api.genderapi.io/api/v2/errors>.
 
@@ -252,12 +269,15 @@ Match on `errorCode` and `status`, never on the `detail` text. The full catalog 
 use GenderApi\Exception\ApiException;
 use GenderApi\Exception\RateLimitException;
 use GenderApi\Exception\TransportException;
+use GenderApi\Exception\UnexpectedAccessModeException;
 use GenderApi\Exception\ValidationException;
 
 try {
     $result = $client->email('alex@example.com');
 } catch (ValidationException $e) {
     // fix the input: $e->pointer
+} catch (UnexpectedAccessModeException $e) {
+    // the key was not used ($e->getAccessMode() is e.g. "ip_trial"); already processed: $e->getResult()
 } catch (RateLimitException $e) {
     // wait $e->retryAfter seconds before sending a NEW request (it is billed normally)
 } catch (ApiException $e) {
@@ -324,6 +344,10 @@ request once, must not follow redirects, and must return 4xx/5xx responses rathe
 | `duration: "4ms"` | `meta.duration_ms` |
 | Generic `\Exception`, 30 s timeout | Typed exceptions, a 10 s default timeout, no retries, no redirects |
 | PHP >= 7.2 | PHP >= 8.1 |
+
+1.x (V1 API) stays available and installable indefinitely; no deprecation or shutdown is planned. To keep using
+it, pin 1.x with `composer require genderapi/genderapi:^1.0`. The source stays on the
+[`v1` branch](https://github.com/GenderAPI/genderapi-php/tree/v1).
 
 Each retry is a new operation with normal billing. See the
 [V2 migration guide](https://www.genderapi.io/docs/v2/migration).

@@ -14,6 +14,15 @@ if (is_string($log) && $log !== '') {
 $scenario = explode('/', trim($path, '/'))[0];
 $examples = json_decode((string) file_get_contents(__DIR__ . '/../fixtures/openapi-v2-examples.json'), true)['examples'];
 
+// Like the API: a request with a key is answered as api_key access, one without as the IP trial.
+if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+    foreach ($examples as $name => $example) {
+        if (is_array($example['meta']['access'] ?? null)) {
+            $examples[$name]['meta']['access'] = ['mode' => 'api_key', 'reason' => null];
+        }
+    }
+}
+
 function respond(int $status, array $body, string $type = 'application/json'): void
 {
     http_response_code($status);

@@ -7,6 +7,7 @@ namespace GenderApi;
 use GenderApi\Exception\ApiException;
 use GenderApi\Exception\GenderApiException;
 use GenderApi\Exception\RedirectException;
+use GenderApi\Exception\UnexpectedAccessModeException;
 use GenderApi\Exception\ValidationException;
 use GenderApi\Http\CurlTransport;
 use GenderApi\Http\HttpRequest;
@@ -39,6 +40,7 @@ final class Client
     private readonly string $baseUrl;
     private readonly float $timeout;
     private readonly Transport $transport;
+    private readonly bool $requireApiKeyAccess;
 
     /**
      * @param string|null    $apiKey    your API key; null reads GENDERAPI_API_KEY; '' or no key uses the shared
@@ -46,6 +48,10 @@ final class Client
      * @param string         $baseUrl   HTTPS API base; plain http is accepted only for localhost/127.0.0.1/[::1] test servers
      * @param float          $timeout   total time limit per request in seconds (default 10)
      * @param Transport|null $transport custom HTTP transport; defaults to cURL, or PHP streams without ext-curl
+     * @param bool           $requireApiKeyAccess when a key is configured (default true), throw
+     *                                  UnexpectedAccessModeException if a successful response reports an access
+     *                                  mode other than "api_key" (e.g. an unrecognised key served as IP trial).
+     *                                  Has no effect without a key or on capabilities()/errorCatalog()
      *
      * @throws ValidationException for an invalid base URL, timeout or key format
      */
@@ -54,6 +60,7 @@ final class Client
         string $baseUrl = self::DEFAULT_BASE_URL,
         float $timeout = self::DEFAULT_TIMEOUT,
         ?Transport $transport = null,
+        bool $requireApiKeyAccess = true,
     ) {
         $this->apiKey = self::resolveApiKey($apiKey);
         $this->baseUrl = self::checkBaseUrl($baseUrl);
@@ -62,6 +69,7 @@ final class Client
         }
         $this->timeout = $timeout;
         $this->transport = $transport ?? (\extension_loaded('curl') ? new CurlTransport() : new StreamTransport());
+        $this->requireApiKeyAccess = $requireApiKeyAccess;
     }
 
     /**
@@ -87,7 +95,7 @@ final class Client
         $item = Item::of($type, $value, $country, $aiMode, $forceToGenderize, $id);
         [$body, $response] = $this->send('POST', '/gender', $item->toArray());
 
-        return GenderResult::fromResponse($body, $response);
+        return $this->checkAccess(GenderResult::fromResponse($body, $response), $response);
     }
 
     /** @throws GenderApiException */
@@ -138,7 +146,7 @@ final class Client
 
         [$body, $response] = $this->send('POST', '/gender/batch', ['items' => $wire]);
 
-        return BatchResult::fromResponse($body, $response);
+        return $this->checkAccess(BatchResult::fromResponse($body, $response), $response);
     }
 
     /**
@@ -150,7 +158,7 @@ final class Client
     {
         [$body, $response] = $this->send('GET', '/usage', null);
 
-        return UsageResult::fromResponse($body, $response);
+        return $this->checkAccess(UsageResult::fromResponse($body, $response), $response);
     }
 
     /**
@@ -164,7 +172,7 @@ final class Client
         $payload = Validator::phone($number, $country);
         [$body, $response] = $this->send('POST', '/phone/validate', $payload);
 
-        return PhoneResult::fromResponse($body, $response);
+        return $this->checkAccess(PhoneResult::fromResponse($body, $response), $response);
     }
 
     /**
@@ -207,10 +215,21 @@ final class Client
         return $this->timeout;
     }
 
+    /** Whether successful keyed responses must report meta.access.mode "api_key" (see the constructor). */
+    public function requiresApiKeyAccess(): bool
+    {
+        return $this->requireApiKeyAccess;
+    }
+
     /** @return array<string, mixed> */
     public function __debugInfo(): array
     {
-        return ['baseUrl' => $this->baseUrl, 'timeout' => $this->timeout, 'hasApiKey' => $this->hasApiKey()];
+        return [
+            'baseUrl' => $this->baseUrl,
+            'timeout' => $this->timeout,
+            'hasApiKey' => $this->hasApiKey(),
+            'requireApiKeyAccess' => $this->requireApiKeyAccess,
+        ];
     }
 
     public function __serialize(): array
@@ -266,6 +285,30 @@ final class Client
         }
 
         return [$decoded, $response];
+    }
+
+    /**
+     * With a key configured and requireApiKeyAccess on, a response whose meta.access.mode is present and not
+     * "api_key" is rejected. The request has already been processed (no retry is made); the result is kept on
+     * the exception. A missing access object or mode is accepted.
+     *
+     * @template T of GenderResult|BatchResult|UsageResult|PhoneResult
+     * @param T $result
+     * @return T
+     *
+     * @throws UnexpectedAccessModeException
+     */
+    private function checkAccess(GenderResult|BatchResult|UsageResult|PhoneResult $result, HttpResponse $response): GenderResult|BatchResult|UsageResult|PhoneResult
+    {
+        if ($this->apiKey === null || !$this->requireApiKeyAccess) {
+            return $result;
+        }
+        $mode = $result->meta->access?->mode;
+        if ($mode === null || $mode === 'api_key') {
+            return $result;
+        }
+
+        throw new UnexpectedAccessModeException($result, $response->status, $response->headers, $response->body);
     }
 
     private static function resolveApiKey(?string $apiKey): ?string
