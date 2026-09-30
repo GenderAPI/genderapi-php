@@ -1,0 +1,258 @@
+{
+ "invalid_json": {
+  "code": "invalid_json",
+  "http_statuses": [
+   400
+  ],
+  "action": "correct_request",
+  "description": "Correct the request using the OpenAPI schema."
+ },
+ "query_not_supported": {
+  "code": "query_not_supported",
+  "http_statuses": [
+   400
+  ],
+  "action": "correct_request",
+  "description": "Correct the request using the OpenAPI schema."
+ },
+ "invalid_client_ip": {
+  "code": "invalid_client_ip",
+  "http_statuses": [
+   400
+  ],
+  "action": "correct_request",
+  "description": "Correct the request using the OpenAPI schema."
+ },
+ "validation_error": {
+  "code": "validation_error",
+  "http_statuses": [
+   422
+  ],
+  "action": "correct_request",
+  "description": "Correct the indicated fields; IP trials allow at most 10 items."
+ },
+ "trial_batch_limit": {
+  "code": "trial_batch_limit",
+  "http_statuses": [
+   422
+  ],
+  "action": "correct_request",
+  "description": "Correct the indicated fields; IP trials allow at most 10 items."
+ },
+ "invalid_api_key": {
+  "code": "invalid_api_key",
+  "http_statuses": [
+   401
+  ],
+  "action": "check_credentials",
+  "description": "Check credentials. Missing or unknown keys may use IP trial access on this deployment."
+ },
+ "access_denied": {
+  "code": "access_denied",
+  "http_statuses": [
+   403
+  ],
+  "action": "check_account",
+  "description": "Check account status and access restrictions. These accounts do not fall back to IP trials."
+ },
+ "key_disabled": {
+  "code": "key_disabled",
+  "http_statuses": [
+   403
+  ],
+  "action": "check_account",
+  "description": "Check account status and access restrictions. These accounts do not fall back to IP trials."
+ },
+ "key_expired": {
+  "code": "key_expired",
+  "http_statuses": [
+   403
+  ],
+  "action": "check_account",
+  "description": "Check account status and access restrictions. These accounts do not fall back to IP trials."
+ },
+ "insufficient_credits": {
+  "code": "insufficient_credits",
+  "http_statuses": [
+   403
+  ],
+  "action": "add_credits_or_wait_for_reset",
+  "description": "At least one starting credit is required. Add credits or wait for a reported trial reset."
+ },
+ "not_found": {
+  "code": "not_found",
+  "http_statuses": [
+   404
+  ],
+  "action": "correct_request",
+  "description": "Use a documented API route."
+ },
+ "method_not_allowed": {
+  "code": "method_not_allowed",
+  "http_statuses": [
+   405
+  ],
+  "action": "correct_request",
+  "description": "Use a method listed in the Allow header."
+ },
+ "payload_too_large": {
+  "code": "payload_too_large",
+  "http_statuses": [
+   413
+  ],
+  "action": "correct_request",
+  "description": "Send an uncompressed UTF-8 JSON body of at most 64 KiB."
+ },
+ "unsupported_encoding": {
+  "code": "unsupported_encoding",
+  "http_statuses": [
+   415
+  ],
+  "action": "correct_request",
+  "description": "Use application/json and uncompressed UTF-8 for POST requests."
+ },
+ "unsupported_media_type": {
+  "code": "unsupported_media_type",
+  "http_statuses": [
+   415
+  ],
+  "action": "correct_request",
+  "description": "Use application/json and uncompressed UTF-8 for POST requests."
+ },
+ "rate_limit_exceeded": {
+  "code": "rate_limit_exceeded",
+  "http_statuses": [
+   429
+  ],
+  "action": "wait_then_retry",
+  "description": "Respect Retry-After. A retry is a new operation and normal charges apply."
+ },
+ "concurrency_limit": {
+  "code": "concurrency_limit",
+  "http_statuses": [
+   429
+  ],
+  "action": "wait_then_retry",
+  "description": "Respect Retry-After. A retry is a new operation and normal charges apply."
+ },
+ "billing_reconciliation_required": {
+  "code": "billing_reconciliation_required",
+  "http_statuses": [
+   503
+  ],
+  "action": "contact_support",
+  "description": "Billing is unconfirmed. Contact support with the request reference; do not automatically retry."
+ },
+ "ai_unavailable": {
+  "code": "ai_unavailable",
+  "http_statuses": [
+   503
+  ],
+  "action": "check_configuration",
+  "description": "AI is unavailable; dataset-only requests can use ai_mode off without forceToGenderize."
+ },
+ "invalid_ai_response": {
+  "code": "invalid_ai_response",
+  "http_statuses": [
+   502
+  ],
+  "action": "inspect_billing_before_retry",
+  "description": "Prediction failed. Check billing_status before sending another request; it starts a new operation."
+ },
+ "ai_upstream_error": {
+  "code": "ai_upstream_error",
+  "http_statuses": [
+   502
+  ],
+  "action": "inspect_billing_before_retry",
+  "description": "Prediction failed. Check billing_status before sending another request; it starts a new operation."
+ },
+ "invalid_dataset_response": {
+  "code": "invalid_dataset_response",
+  "http_statuses": [
+   502
+  ],
+  "action": "inspect_billing_before_retry",
+  "description": "Prediction failed. Check billing_status before sending another request; it starts a new operation."
+ },
+ "prediction_timeout": {
+  "code": "prediction_timeout",
+  "http_statuses": [
+   504
+  ],
+  "action": "inspect_billing_before_retry",
+  "description": "The prediction timed out. Confirm billing before starting any new operation."
+ },
+ "dependency_timeout": {
+  "code": "dependency_timeout",
+  "http_statuses": [
+   503
+  ],
+  "action": "inspect_billing_before_retry",
+  "description": "A dependency is unavailable. Inspect billing_status before retrying; do not automatically retry unconfirmed billing."
+ },
+ "dataset_timeout": {
+  "code": "dataset_timeout",
+  "http_statuses": [
+   503
+  ],
+  "action": "inspect_billing_before_retry",
+  "description": "A dependency is unavailable. Inspect billing_status before retrying; do not automatically retry unconfirmed billing."
+ },
+ "billing_timeout": {
+  "code": "billing_timeout",
+  "http_statuses": [
+   503
+  ],
+  "action": "inspect_billing_before_retry",
+  "description": "A dependency is unavailable. Inspect billing_status before retrying; do not automatically retry unconfirmed billing."
+ },
+ "billing_unavailable": {
+  "code": "billing_unavailable",
+  "http_statuses": [
+   503
+  ],
+  "action": "inspect_billing_before_retry",
+  "description": "A dependency is unavailable. Inspect billing_status before retrying; do not automatically retry unconfirmed billing."
+ },
+ "trial_unavailable": {
+  "code": "trial_unavailable",
+  "http_statuses": [
+   503
+  ],
+  "action": "inspect_billing_before_retry",
+  "description": "A dependency is unavailable. Inspect billing_status before retrying; do not automatically retry unconfirmed billing."
+ },
+ "prediction_unavailable": {
+  "code": "prediction_unavailable",
+  "http_statuses": [
+   503
+  ],
+  "action": "inspect_billing_before_retry",
+  "description": "A dependency is unavailable. Inspect billing_status before retrying; do not automatically retry unconfirmed billing."
+ },
+ "server_busy": {
+  "code": "server_busy",
+  "http_statuses": [
+   503
+  ],
+  "action": "inspect_billing_before_retry",
+  "description": "A dependency is unavailable. Inspect billing_status before retrying; do not automatically retry unconfirmed billing."
+ },
+ "service_unavailable": {
+  "code": "service_unavailable",
+  "http_statuses": [
+   503
+  ],
+  "action": "inspect_billing_before_retry",
+  "description": "A dependency is unavailable. Inspect billing_status before retrying; do not automatically retry unconfirmed billing."
+ },
+ "internal_error": {
+  "code": "internal_error",
+  "http_statuses": [
+   500
+  ],
+  "action": "contact_support",
+  "description": "Contact support using request_id."
+ }
+}

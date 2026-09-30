@@ -4,3 +4,9 @@
 # PhpStorm / IDE
 .idea/
 *.iml
+
+# Composer / PHPUnit
+/vendor/
+/composer.lock
+/.phpunit.cache/
+/.phpunit.result.cache

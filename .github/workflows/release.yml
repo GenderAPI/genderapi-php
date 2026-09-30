@@ -1,0 +1,62 @@
+name: Release
+
+# Packagist publishes new versions from git tags. This workflow runs when a vX.Y.Z tag is pushed:
+# it checks the tag against GenderApi\Client::VERSION, runs the tests, creates the GitHub release and
+# (optionally) asks Packagist to update right away.
+#
+# Optional repository secrets (the Packagist GitHub hook makes them unnecessary):
+#   PACKAGIST_USERNAME  - Packagist username of a package maintainer
+#   PACKAGIST_TOKEN     - that user's Packagist API token (https://packagist.org/profile/)
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: curl, json
+          coverage: none
+          tools: composer:v2
+
+      - run: composer validate --strict
+      - run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Check tag matches Client::VERSION
+        run: |
+          version="$(php -r 'require "vendor/autoload.php"; echo GenderApi\Client::VERSION;')"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match Client::VERSION ${version}" >&2
+            exit 1
+          fi
+
+      - run: vendor/bin/phpunit
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" --verify-tag --title "${GITHUB_REF_NAME}" --notes "See CHANGELOG.md for details."
+
+      - name: Notify Packagist
+        env:
+          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
+        run: |
+          if [ -z "${PACKAGIST_USERNAME}" ] || [ -z "${PACKAGIST_TOKEN}" ]; then
+            echo "Packagist secrets not set; relying on the Packagist GitHub hook."
+            exit 0
+          fi
+          curl -fsS -X POST \
+            -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer ${PACKAGIST_USERNAME}:${PACKAGIST_TOKEN}" \
+            -d "{\"repository\":{\"url\":\"https://github.com/${GITHUB_REPOSITORY}\"}}" \
+            https://packagist.org/api/update-package
